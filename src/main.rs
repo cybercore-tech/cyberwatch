@@ -217,12 +217,26 @@ fn suspend_and_act(
         DisableMouseCapture
     )?;
 
-    println!("\n=== systemctl {} {} ===", verb_str(job.verb), job.unit);
-    match actions::run_inherited(job.verb, &job.unit) {
-        Ok(status) if status.success() => println!("done."),
-        Ok(status) => println!("systemctl exited with {status}"),
-        Err(e) => println!("failed to run systemctl: {e}"),
-    }
+    let action_label = match job.action {
+        app::Action::Systemctl(verb) => {
+            println!("\n=== systemctl {} {} ===", verb_str(verb), job.unit);
+            match actions::run_inherited(verb, &job.unit) {
+                Ok(status) if status.success() => println!("done."),
+                Ok(status) => println!("systemctl exited with {status}"),
+                Err(e) => println!("failed to run systemctl: {e}"),
+            }
+            verb_str(verb).to_string()
+        }
+        app::Action::Edit => {
+            println!("\n=== sudoedit {} ===", actions::unit_file_path(&job.unit));
+            match actions::edit_inherited(&job.unit) {
+                Ok(status) if status.success() => println!("saved (daemon-reload done)."),
+                Ok(status) => println!("sudoedit/daemon-reload exited with {status}"),
+                Err(e) => println!("failed to edit: {e}"),
+            }
+            "edit".to_string()
+        }
+    };
     println!("\nPress Enter to return to cyberwatch.");
     let mut discard = String::new();
     let _ = io::stdin().read_line(&mut discard);
@@ -235,11 +249,7 @@ fn suspend_and_act(
     )?;
     terminal.clear()?;
 
-    app.status = Some(format!(
-        "{} {}: refreshing...",
-        verb_str(job.verb),
-        job.unit
-    ));
+    app.status = Some(format!("{action_label} {}: refreshing...", job.unit));
     app.pending = Some(Pending::Rescan);
     Ok(())
 }
@@ -265,7 +275,7 @@ fn handle_normal(app: &mut App, code: KeyCode, mods: KeyModifiers) {
         KeyCode::Char('s') => {
             if let Some(u) = app.selected_unit() {
                 app.action_job = Some(ActionJob {
-                    verb: Verb::Start,
+                    action: app::Action::Systemctl(Verb::Start),
                     unit: u.name.clone(),
                 });
             }
@@ -273,7 +283,7 @@ fn handle_normal(app: &mut App, code: KeyCode, mods: KeyModifiers) {
         KeyCode::Char('x') => {
             if let Some(u) = app.selected_unit() {
                 app.action_job = Some(ActionJob {
-                    verb: Verb::Stop,
+                    action: app::Action::Systemctl(Verb::Stop),
                     unit: u.name.clone(),
                 });
             }
@@ -281,7 +291,15 @@ fn handle_normal(app: &mut App, code: KeyCode, mods: KeyModifiers) {
         KeyCode::Char('r') => {
             if let Some(u) = app.selected_unit() {
                 app.action_job = Some(ActionJob {
-                    verb: Verb::Restart,
+                    action: app::Action::Systemctl(Verb::Restart),
+                    unit: u.name.clone(),
+                });
+            }
+        }
+        KeyCode::Char('e') => {
+            if let Some(u) = app.selected_unit() {
+                app.action_job = Some(ActionJob {
+                    action: app::Action::Edit,
                     unit: u.name.clone(),
                 });
             }

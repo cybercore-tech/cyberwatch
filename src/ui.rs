@@ -143,7 +143,8 @@ fn draw_status(frame: &mut Frame, app: &App, theme: &Theme, area: Rect) {
 }
 
 fn draw_footer(frame: &mut Frame, theme: &Theme, area: Rect) {
-    let text = "j/k nav  s start  x stop  r restart  l logs  /  filter  R rescan  ? help  q quit";
+    let text =
+        "j/k nav  s start  x stop  r restart  e edit  l logs  /  filter  R rescan  ? help  q quit";
     frame.render_widget(
         Paragraph::new(text).style(Style::default().fg(theme.muted)),
         area,
@@ -198,6 +199,7 @@ fn draw_help_popup(frame: &mut Frame, area: Rect, theme: &Theme) {
         "s          start the selected unit (sudo)",
         "x          stop the selected unit (sudo)",
         "r          restart the selected unit (sudo)",
+        "e          edit the unit file (sudoedit + daemon-reload)",
         "l          show recent journal output",
         "R          rescan (re-discover + refresh all)",
         "?          toggle this help",

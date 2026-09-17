@@ -17,11 +17,17 @@ pub enum Pending {
     Rescan,
 }
 
-/// `sudo systemctl <verb> <unit>` needs a real terminal for its password
-/// prompt — the exact same reason cyberfleet suspends the TUI for `git
-/// fetch`'s SSH prompt rather than running it as ordinary `Pending` work.
+/// `sudo systemctl <verb> <unit>` (or `sudoedit` on the unit file) needs a
+/// real terminal for its password prompt / editor session — the exact
+/// same reason cyberfleet suspends the TUI for `git fetch`'s SSH prompt
+/// rather than running it as ordinary `Pending` work.
+pub enum Action {
+    Systemctl(Verb),
+    Edit,
+}
+
 pub struct ActionJob {
-    pub verb: Verb,
+    pub action: Action,
     pub unit: String,
 }
 
