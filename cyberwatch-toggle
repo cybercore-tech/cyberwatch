@@ -1,0 +1,118 @@
+#!/usr/bin/env bash
+# Launches Cyberwatch in a floating terminal, or — with `--summary` — just
+# resolves the binary and runs its `--summary` mode for the bar widget's
+# periodic poll (no terminal, no window). Same bootstrap as cyberfleet's
+# own toggle script.
+#
+# Deliberately does NOT fetch or execute a remote build artifact — no
+# download-then-chmod-then-run of a release asset, and no
+# `cargo install --git <remote>`. Instead:
+#   1. use the bundled bin/<arch>/cyberwatch shipped in this checkout, or
+#   2. build THIS checkout's own already-cloned source with `cargo build
+#      --locked` (no new code fetched), caching the result for next time, or
+#   3. tell the user how to get a binary themselves.
+set -euo pipefail
+
+PLUGIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WINDOW_TITLE="Cyberwatch"
+BIN_DIR=""
+CYBERWATCH_BIN=""
+
+arch_dir() {
+  case "$(uname -m)" in
+    x86_64 | amd64) echo "linux-x86_64" ;;
+    aarch64 | arm64) echo "linux-aarch64" ;;
+    *) echo "linux-$(uname -m)" ;;
+  esac
+}
+
+notify() {
+  if command -v notify-send >/dev/null 2>&1; then
+    notify-send "Cyberwatch" "$1" || true
+  fi
+  echo "cyberwatch-toggle: $1" >&2
+}
+
+resolve_bin() {
+  BIN_DIR="$PLUGIN_DIR/bin/$(arch_dir)"
+  CYBERWATCH_BIN="$BIN_DIR/cyberwatch"
+}
+
+build_from_local_source() {
+  command -v cargo >/dev/null 2>&1 || return 1
+  [[ -f "$PLUGIN_DIR/Cargo.toml" && -f "$PLUGIN_DIR/Cargo.lock" ]] || return 1
+  mkdir -p "$BIN_DIR"
+  notify "Building cyberwatch for $(arch_dir) (first run)…"
+  local build_dir="$PLUGIN_DIR/.cargo-build"
+  rm -rf "$build_dir"
+  if ! CARGO_TARGET_DIR="$build_dir" cargo build --release --locked \
+    --manifest-path "$PLUGIN_DIR/Cargo.toml"; then
+    rm -rf "$build_dir"
+    return 1
+  fi
+  cp "$build_dir/release/cyberwatch" "$CYBERWATCH_BIN"
+  chmod +x "$CYBERWATCH_BIN"
+  rm -rf "$build_dir"
+}
+
+ensure_binary() {
+  resolve_bin
+  if [[ -x "$CYBERWATCH_BIN" ]]; then
+    return 0
+  fi
+
+  if build_from_local_source; then
+    return 0
+  fi
+
+  notify "No cyberwatch binary for $(arch_dir) and no cargo available to build one. \
+Install Rust (https://rustup.rs), or build it yourself from \
+~/.sysops/cyberwatch and place it at: $CYBERWATCH_BIN"
+  return 1
+}
+
+focus_existing() {
+  hyprctl dispatch focuswindow "title:^(${WINDOW_TITLE})$" 2>/dev/null | grep -q ok
+}
+
+launch() {
+  local terminal="${TERMINAL:-}"
+  if [[ -z "$terminal" ]]; then
+    for candidate in ghostty alacritty kitty foot; do
+      if command -v "$candidate" >/dev/null 2>&1; then
+        terminal="$candidate"
+        break
+      fi
+    done
+  fi
+
+  case "$terminal" in
+    alacritty)
+      exec setsid uwsm-app -- alacritty --class "$WINDOW_TITLE" --title "$WINDOW_TITLE" -e "$CYBERWATCH_BIN"
+      ;;
+    kitty)
+      exec setsid uwsm-app -- kitty --class "$WINDOW_TITLE" --title "$WINDOW_TITLE" "$CYBERWATCH_BIN"
+      ;;
+    ghostty)
+      exec setsid uwsm-app -- ghostty --title="$WINDOW_TITLE" -e "$CYBERWATCH_BIN"
+      ;;
+    foot)
+      exec setsid uwsm-app -- foot --title="$WINDOW_TITLE" "$CYBERWATCH_BIN"
+      ;;
+    *)
+      exec setsid uwsm-app -- xdg-terminal-exec --title="$WINDOW_TITLE" -e "$CYBERWATCH_BIN"
+      ;;
+  esac
+}
+
+ensure_binary || exit 1
+
+if [[ "${1:-}" == "--summary" ]]; then
+  exec "$CYBERWATCH_BIN" --summary
+fi
+
+if focus_existing; then
+  exit 0
+fi
+
+launch

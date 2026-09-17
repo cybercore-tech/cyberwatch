@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "custom.cyberwatch",
+  "name": "Cyberwatch",
+  "version": "0.1.0",
+  "author": "darkstardevx",
+  "license": "MIT",
+  "description": "Live systemd dashboard for your own services — see failed/stopped units from the bar, drill into a full TUI to start/stop/restart and tail logs. Personal use, not marketplace-listed.",
+  "kinds": ["bar-widget"],
+  "entryPoints": {
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Cyberwatch",
+    "description": "Your own systemd units at a glance",
+    "category": "Developer Tools",
+    "allowMultiple": false,
+    "defaultSection": "right"
+  }
+}
