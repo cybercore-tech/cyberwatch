@@ -130,11 +130,16 @@ cyberwatch --list        <span class="c"># every watched unit as JSON</span></co
     </section>
   </main>
 
+  <section class="contact-band" aria-label="Contact Cybercore Tech">
+    <div class="wrap"><cybercore-contact repo="cyberwatch"><a href="mailto:dev@cybercoretech.net">dev@cybercoretech.net</a></cybercore-contact></div>
+  </section>
+
   <footer><span>CYBERCORE TECH / CYBERWATCH / MIT / © <span id="year"></span></span><span><a href="https://cybercore-tech.github.io/">CYBERCORE-TECH.GITHUB.IO</a> · <a href="https://github.com/cybercore-tech/cyberwatch">SOURCE</a></span></footer>
   <script>
     (() => { const a = document.getElementById('attn'); if (!a || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
       let t = 0; setInterval(() => { t = (t + 1) % 9; a.textContent = t < 5 ? '1 needs attention' : '0 need attention'; a.style.color = t < 5 ? 'var(--a3)' : 'var(--a1)'; }, 1000); })();
   </script>
   <script src="app.js"></script>
+  <script type="module" src="https://cybercore-tech.github.io/kit/contact.js"></script>
 </body>
 </html>
