@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en" data-theme="cyberwatch-unit-pulse">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Cyberwatch — your services, at a glance</title>
+  <meta name="description" content="Cyberwatch: a live systemd dashboard for your own services — an Omarchy bar widget that counts what needs attention, and a TUI to start, stop, restart, edit and tail.">
+  <meta name="theme-color" content="#09080f">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect x='8' y='8' width='38' height='38' fill='%2339ff33'/%3E%3Crect x='54' y='8' width='38' height='38' fill='%2339ff33'/%3E%3Crect x='8' y='54' width='38' height='38' fill='%23f1142d'/%3E%3Crect x='54' y='54' width='38' height='38' fill='%2339ff33'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    :root { --a1: var(--acid); --a2: var(--cyan); --a3: var(--red); }
+    .wall { position: relative; width: min(100%, 32rem); margin-inline: auto; padding: 1.1rem; border: 1px solid var(--line); background: color-mix(in srgb, var(--panel) 85%, transparent); }
+    .wall-head { display: flex; justify-content: space-between; margin-bottom: .9rem; color: var(--muted); font: .72rem/1 var(--mono); letter-spacing: .14em; }
+    .wall-head b { color: var(--a1); font-weight: 400; }
+    .tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .55rem; }
+    .tile { position: relative; padding: .7rem .7rem .65rem; border: 1px solid var(--line); background: color-mix(in srgb, var(--bg) 60%, transparent); font: .72rem/1.3 var(--mono); color: var(--white); overflow: hidden; }
+    .tile small { display: block; margin-top: .35rem; color: var(--a1); letter-spacing: .1em; }
+    .tile::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--a1); box-shadow: 0 0 10px var(--a1); animation: beat 2.4s ease-in-out infinite; }
+    .tile:nth-child(3n)::before { animation-delay: -.8s; } .tile:nth-child(3n+1)::before { animation-delay: -1.6s; }
+    @keyframes beat { 50% { opacity: .35; } }
+    .tile.timer small { color: var(--a2); } .tile.timer::before { background: var(--a2); box-shadow: 0 0 10px var(--a2); }
+    .tile.failed { border-color: var(--a3); animation: flip 9s steps(1) infinite; }
+    .tile.failed small { color: var(--a3); } .tile.failed::before { background: var(--a3); box-shadow: 0 0 12px var(--a3); }
+    @keyframes flip { 0%, 60% { background: color-mix(in srgb, var(--a3) 16%, transparent); } 61%, 100% { background: color-mix(in srgb, var(--bg) 60%, transparent); } }
+    .rules { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.1rem; }
+    @media (max-width: 960px) { .rules { grid-template-columns: 1fr; } }
+    @media (max-width: 420px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  </style>
+  <script>
+    window.SITE = {
+      defaultTheme: 'cyberwatch-unit-pulse',
+      mashups: [
+        { id: 'cyberwatch-unit-pulse', label: 'UNIT PULSE', base: 'cyberdyne-system', accent: 'cyberpunk-neon' },
+        { id: 'cyberwatch-green-board', label: 'GREEN BOARD', base: 'kanagawa', accent: 'neosynth-pulse' },
+        { id: 'cyberwatch-red-alert', label: 'RED ALERT', base: 'dystopian-ash', accent: 'cyberdyne-judgment' }
+      ]
+    };
+  </script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="https://cybercore-tech.github.io/" data-brand-phase="0" aria-label="Cybercore Tech home"><span class="brand-emblem">CC</span><span class="brand-name">CYBERCORE <b>/</b> CYBERWATCH<small>OMARCHY INTEGRATIONS</small></span></a>
+    <nav class="main-nav" aria-label="Primary"><a href="#discover">DISCOVERY</a><a href="#attention">ATTENTION</a><a href="#setup">SETUP</a><a href="#themes">THEMES</a></nav>
+    <div class="theme-picker"><span class="theme-label">THEME</span><button id="themeButton" class="theme-button" type="button" aria-haspopup="listbox" aria-expanded="false" aria-controls="themeMenu">LOADING THEMES…</button><div id="themeMenu" class="theme-menu" role="listbox" aria-label="Theme" hidden></div></div>
+  </header>
+
+  <main>
+    <section class="wrap hero">
+      <div>
+        <p class="eyebrow">systemd dashboard · Omarchy · Rust · ratatui</p>
+        <h1><span class="glitch" data-text="CYBER">CYBER</span><br><em>WATCH</em></h1>
+        <p class="tagline">Your own services, one glance away. Broken ones float straight to the top.</p>
+        <p class="lede">An Omarchy bar widget counts the units that need you; click it for a TUI that starts, stops, restarts and edits them and tails their logs. It finds your services on its own — no list to maintain — and understands timers well enough not to cry wolf.</p>
+        <div class="chips"><span class="chip"><b>◆</b> AUTO-DISCOVERY</span><span class="chip"><b>◆</b> TIMER-AWARE</span><span class="chip"><b>◆</b> SUDOEDIT</span><span class="chip"><b>◆</b> MIT</span></div>
+        <div class="cta"><a class="btn" href="https://github.com/cybercore-tech/cyberwatch">VIEW SOURCE ↗</a><a class="btn ghost" href="#setup">INSTALL</a></div>
+      </div>
+      <div class="wall reveal" aria-hidden="true">
+        <div class="wall-head"><span>cyberwatch — 11 units</span><b id="attn">0 need attention</b></div>
+        <div class="tiles">
+          <div class="tile">argus<small>RUNNING</small></div>
+          <div class="tile">vortexwall<small>RUNNING</small></div>
+          <div class="tile timer">sigilward-check<small>WAITING</small></div>
+          <div class="tile">cyberdeck<small>RUNNING</small></div>
+          <div class="tile failed" id="failTile">wraithflow<small>FAILED</small></div>
+          <div class="tile timer">chronicle-check<small>WAITING</small></div>
+          <div class="tile">dockspace<small>RUNNING</small></div>
+          <div class="tile">cybercore-wiki<small>RUNNING</small></div>
+          <div class="tile">diag-deck<small>RUNNING</small></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="wrap section" id="discover">
+      <div class="section-head reveal"><div><p class="eyebrow">01 / Discovery</p><h2>It finds<br><em>your services.</em></h2></div><p>No hand-kept list. Cyberwatch reads the unit files in <code>/etc/systemd/system</code> and keeps the ones that are plausibly <i>yours</i> — then lets you patch the result.</p></div>
+      <div class="grid g3">
+        <div class="card c-acid reveal"><span class="num">◆ YOURS, NOT THE DISTRO'S</span><h3>EXECSTART UNDER $HOME</h3><p>A <code>.service</code> whose binary lives under your home directory is yours. NetworkManager and sshd never clutter the list.</p></div>
+        <div class="card c-cyan reveal"><span class="num">◆ TIMERS FOLLOW</span><h3>PAIRED TIMERS</h3><p>Any <code>.timer</code> that triggers one of those services — via <code>Unit=</code> or the same basename — comes along automatically.</p></div>
+        <div class="card c-pink reveal"><span class="num">◆ YOUR OVERRIDES</span><h3>EXTRA &amp; IGNORE</h3><p><code>~/.config/cyberwatch/config.json</code> adds units the heuristic misses (root-owned binaries in <code>/usr/local/bin</code>, say) or drops ones you don't care about.</p></div>
+      </div>
+    </section>
+
+    <section class="wrap section" id="attention">
+      <div class="section-head reveal"><div><p class="eyebrow">02 / Needs attention</p><h2>Only what's<br><em>actually wrong.</em></h2></div><p>One rule drives both the bar count and the TUI's sort order — and it knows the difference between a broken daemon and a timer's service resting between runs.</p></div>
+      <div class="rules">
+        <ul class="list reveal"><li><b>Failed</b> — any service in <code>failed</code> state.</li><li><b>Should be running, isn't</b> — an <i>enabled</i> daemon that isn't active.</li><li><b>Timer down</b> — a timer that isn't active.</li><li><b>Last run went bad</b> — a timer-triggered service whose last <code>Result=</code> wasn't success.</li><li><b>Missing</b> — a configured unit that no longer exists.</li></ul>
+        <div class="console reveal">
+          <div class="console-head"><span>● ● ● &nbsp; cyberwatch --summary</span><strong>BAR FEED</strong></div>
+          <pre class="term" data-type><span><span class="t-prompt">❯</span> cyberwatch --summary</span><span class="t-ok">{"attention":0,"total":11}</span><span> </span><span><span class="t-prompt">❯</span> cyberwatch --list | jq '.[0]'</span><span><span class="t-dim">{ "name": "argus.service", "kind": "service",</span></span><span><span class="t-dim">  "status_label": "running", "needs_attention": false }</span></span></pre>
+        </div>
+      </div>
+    </section>
+
+    <section class="wrap section">
+      <div class="section-head reveal"><div><p class="eyebrow">03 / The TUI</p><h2>Fix it<br><em>right there.</em></h2></div><p>Actions run <code>sudo systemctl</code> and <code>sudoedit</code> in your real terminal — the TUI steps aside for the password prompt, then comes back and rescans. Editing uses <code>sudoedit</code>, so your editor never runs as root, followed by an automatic <code>daemon-reload</code>.</p></div>
+      <div class="grid g4">
+        <div class="card c-acid reveal"><span class="num">s / x / r</span><h3>START · STOP · RESTART</h3><p>Via <code>sudo systemctl</code>.</p></div>
+        <div class="card c-cyan reveal"><span class="num">e</span><h3>EDIT UNIT</h3><p><code>sudoedit</code> + <code>daemon-reload</code>.</p></div>
+        <div class="card c-pink reveal"><span class="num">l</span><h3>LOGS</h3><p>Recent journal output, no sudo needed.</p></div>
+        <div class="card c-orange reveal"><span class="num">/ · R · ?</span><h3>FILTER · RESCAN · HELP</h3><p><code>j/k</code> to move, <code>q</code> to quit.</p></div>
+      </div>
+    </section>
+
+    <section class="wrap section" id="setup">
+      <div class="section-head reveal"><div><p class="eyebrow">04 / Setup</p><h2>Post<br><em>the watch.</em></h2></div><p>It ships as an Omarchy plugin with a bundled binary. Without one for your architecture, the launcher builds this same checkout with <code>cargo build --locked</code> — it never fetches and executes a remote artifact.</p></div>
+      <div class="grid g2">
+        <div class="reveal"><span class="label">BUILD THE BUNDLED BINARY</span>
+<pre class="code" data-copy><code>git clone https://github.com/cybercore-tech/cyberwatch
+cd cyberwatch && ./install.sh    <span class="c"># builds + places bin/&lt;arch&gt;/cyberwatch</span>
+
+cyberwatch               <span class="c"># TUI</span>
+cyberwatch --summary     <span class="c"># one-line JSON for the bar</span>
+cyberwatch --list        <span class="c"># every watched unit as JSON</span></code></pre></div>
+        <div class="reveal"><span class="label">~/.config/cyberwatch/config.json</span>
+<pre class="code" data-copy><code>{
+  <span class="k">"extra_units"</span>: [<span class="s">"argus.service"</span>, <span class="s">"dockspace.service"</span>],
+  <span class="k">"ignore"</span>: []
+}</code></pre>
+          <ul class="list" style="margin-top:1.2rem"><li><b>Root-owned services</b> run from <code>/usr/local/bin</code> (as they should), so add them to <code>extra_units</code>.</li></ul></div>
+      </div>
+    </section>
+
+    <section class="wrap section" id="themes">
+      <div class="section-head reveal"><div><p class="eyebrow">05 / Theme matrix</p><h2>Light<br><em>the board.</em></h2></div><p>Every Cybercore palette from the shared schema, grouped by family — plus Cyberwatch's own <b>signature mashups</b>. Your pick follows you across Cybercore sites.</p></div>
+      <div class="theme-strip reveal"><div><span class="label">NOW RUNNING · <span id="themeCount">…</span></span><div class="now" data-active-theme>…</div><div class="recipe" id="themeRecipe"></div></div><div></div><div id="swatches"></div></div>
+    </section>
+
+    <section class="wrap section" style="padding-top:0">
+      <div class="card c-pink related reveal"><div><span class="num">◆ SISTER WIDGET</span><h3>CYBERFLEET — YOUR REPOS</h3><p>The same idea for git: a bar count of repos needing attention, and a TUI to fetch, diff and jump in.</p></div><a class="btn" href="https://cybercore-tech.github.io/cyberfleet/">CYBERFLEET ↗</a></div>
+    </section>
+  </main>
+
+  <footer><span>CYBERCORE TECH / CYBERWATCH / MIT / © <span id="year"></span></span><span><a href="https://cybercore-tech.github.io/">CYBERCORE-TECH.GITHUB.IO</a> · <a href="https://github.com/cybercore-tech/cyberwatch">SOURCE</a></span></footer>
+  <script>
+    (() => { const a = document.getElementById('attn'); if (!a || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      let t = 0; setInterval(() => { t = (t + 1) % 9; a.textContent = t < 5 ? '1 needs attention' : '0 need attention'; a.style.color = t < 5 ? 'var(--a3)' : 'var(--a1)'; }, 1000); })();
+  </script>
+  <script src="app.js"></script>
+</body>
+</html>
