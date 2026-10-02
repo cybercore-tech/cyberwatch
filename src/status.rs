@@ -1,3 +1,4 @@
+use crate::unit::Unit;
 use std::collections::HashMap;
 use std::process::Command;
 
@@ -31,7 +32,13 @@ impl UnitStatus {
             return true;
         }
         match self.kind {
-            Kind::Timer => self.active_state != "active",
+            // A disabled timer that isn't running is switched off on
+            // purpose; only a failed one, or an enabled one that isn't
+            // active, is a problem.
+            Kind::Timer => {
+                self.active_state == "failed"
+                    || (self.unit_file_state == "enabled" && self.active_state != "active")
+            }
             Kind::Service => {
                 if self.active_state == "failed" {
                     return true;
@@ -64,15 +71,17 @@ impl UnitStatus {
     }
 }
 
-/// One `systemctl show` call per unit, parsed as real `KEY=VALUE` lines —
+/// One `systemctl show` call per unit (`--user` for `user:` units), parsed as real `KEY=VALUE` lines —
 /// deliberately NOT `--value` with multiple `--property=` flags: verified
 /// live that systemd prints those in its own fixed property order, not the
 /// order they're passed on the command line, so a positional read would
 /// silently pair the wrong value with the wrong field.
 pub fn unit_status(name: &str, kind: Kind, has_timer: bool) -> UnitStatus {
+    let unit = Unit::parse(name);
     let out = Command::new("systemctl")
+        .args(unit.systemctl_scope_args())
         .arg("show")
-        .arg(name)
+        .arg(&unit.name)
         .arg("--property=LoadState")
         .arg("--property=ActiveState")
         .arg("--property=SubState")
@@ -110,8 +119,7 @@ pub fn unit_status(name: &str, kind: Kind, has_timer: bool) -> UnitStatus {
 /// only and never prompts for input).
 pub fn journal_tail(unit: &str, n: u32) -> String {
     let out = Command::new("journalctl")
-        .arg("-u")
-        .arg(unit)
+        .args(Unit::parse(unit).journal_args())
         .arg("-n")
         .arg(n.to_string())
         .arg("--no-pager")
@@ -182,6 +190,13 @@ mod tests {
     fn timer_needs_attention_when_not_active() {
         assert!(!unit(Kind::Timer, "active", "enabled", "", false).needs_attention());
         assert!(unit(Kind::Timer, "failed", "enabled", "", false).needs_attention());
+        assert!(unit(Kind::Timer, "inactive", "enabled", "", false).needs_attention());
+    }
+
+    #[test]
+    fn disabled_inactive_timer_is_fine() {
+        assert!(!unit(Kind::Timer, "inactive", "disabled", "", false).needs_attention());
+        assert!(unit(Kind::Timer, "failed", "disabled", "", false).needs_attention());
     }
 
     #[test]

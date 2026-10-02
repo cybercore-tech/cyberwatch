@@ -1,6 +1,6 @@
 use crate::app::{App, Mode};
-use crate::status::Kind;
 use crate::theme::Theme;
+use cyberwatch::status::Kind;
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Modifier, Style};
