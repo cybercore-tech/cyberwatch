@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Launches Cyberwatch in a floating terminal, or — with `--summary` — just
 # resolves the binary and runs its `--summary` mode for the bar widget's
-# periodic poll (no terminal, no window). Same bootstrap as cyberfleet's
+# periodic poll (no terminal, no window), or — with `--web` — opens/focuses
+# DaemonHall (falling back to the terminal). Same bootstrap as cyberfleet's
 # own toggle script.
 #
 # Deliberately does NOT fetch or execute a remote build artifact — no
@@ -104,6 +105,42 @@ launch() {
       ;;
   esac
 }
+
+# --web: open DaemonHall (the web dashboard over the same watch list) as its
+# own app window, or focus it if one is already open. Falls back to the TUI
+# when DaemonHall isn't running.
+open_daemonhall() {
+  # localhost, not 127.0.0.1: a different host gives the app window its own
+  # class (brave-localhost__-Default), so it isn't caught by window rules
+  # written for other 127.0.0.1 web apps (e.g. a Cyberdeck scratchpad rule).
+  local url="http://localhost:${DAEMONHALL_PORT:-8767}/"
+  if command -v curl >/dev/null 2>&1 && curl -fsS -m 1 -o /dev/null "$url"; then
+    # Focus an open DaemonHall app window: its title is exactly the page title,
+    # "DAEMONHALL" or "(N) DAEMONHALL". Matched case-sensitively and whole, so
+    # a Files window or terminal that's merely in a "DaemonHall" folder isn't
+    # mistaken for it (omarchy-launch-or-focus matches case-insensitively).
+    local addr=""
+    if command -v hyprctl >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
+      addr="$(hyprctl clients -j | jq -r '.[] | select(.title | test("^(\\([0-9]+\\) )?DAEMONHALL$")) | .address' | head -n1)"
+    fi
+    if [[ -n "$addr" ]]; then
+      # Lua-config Hyprland takes hl.dsp.*; older versions take focuswindow
+      # (same fallback as omarchy-launch-or-focus).
+      hyprctl dispatch "hl.dsp.focus({ window = \"address:$addr\" })" >/dev/null 2>&1 ||
+        hyprctl dispatch focuswindow "address:$addr" >/dev/null 2>&1
+      exit 0
+    fi
+    if command -v omarchy-launch-webapp >/dev/null 2>&1; then
+      exec setsid omarchy-launch-webapp "$url"
+    fi
+    exec setsid xdg-open "$url"
+  fi
+  notify "DaemonHall isn't running on $url, opening the TUI instead."
+}
+
+if [[ "${1:-}" == "--web" ]]; then
+  open_daemonhall
+fi
 
 ensure_binary || exit 1
 
