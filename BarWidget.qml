@@ -17,9 +17,13 @@ BarWidget {
   property int total: 0
   property bool haveData: false
 
-  function launch() {
+  // Left click: DaemonHall (web dashboard, same watch list). Right click: the
+  // TUI in a terminal. The toggle script falls back to the TUI by itself when
+  // DaemonHall isn't running.
+  function launch(button) {
     if (!root.bar) return
-    root.bar.run(Util.shellQuote(root.togglePath))
+    var args = button === Qt.RightButton ? "" : " --web"
+    root.bar.run(Util.shellQuote(root.togglePath) + args)
   }
 
   function parseSummary(raw) {
@@ -66,7 +70,7 @@ BarWidget {
     bar: root.bar
     text: root.haveData ? (" " + root.attention) : ""
     tooltipText: root.haveData
-      ? (root.attention + " of " + root.total + " units need attention — click to open cyberwatch")
+      ? (root.attention + " of " + root.total + " units need attention\nClick: DaemonHall · Right-click: cyberwatch TUI")
       : "cyberwatch — scanning…"
     active: root.haveData && root.attention > 0
     activeColor: Color.urgent
@@ -74,6 +78,6 @@ BarWidget {
     verticalPadding: 6
     fixedWidth: root.vertical ? root.barSize : Style.space(28)
     fixedHeight: root.barSize
-    onPressed: root.launch()
+    onPressed: function(button) { root.launch(button) }
   }
 }
