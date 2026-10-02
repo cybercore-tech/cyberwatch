@@ -1,8 +1,8 @@
-use crate::actions::Verb;
-use crate::config::{self, Config};
-use crate::discover;
-use crate::status::{self, Kind, UnitStatus};
 use anyhow::Result;
+use cyberwatch::actions::Verb;
+use cyberwatch::config::{self, Config};
+use cyberwatch::discover;
+use cyberwatch::status::{self, Kind, UnitStatus};
 
 pub enum Mode {
     Normal,

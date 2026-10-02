@@ -1,11 +1,14 @@
 use crate::config::Config;
+use crate::unit::USER_PREFIX;
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
 
 const UNIT_DIR: &str = "/etc/systemd/system";
 
-/// Finds every unit that's plausibly "your own": a `.service` whose
+/// Finds every unit that's plausibly "your own".
+///
+/// System units: a `.service` whose
 /// `ExecStart=` binary path lives under `$HOME` (catches every tool this
 /// ecosystem has, excludes distro/system services like NetworkManager or
 /// sshd), plus any `.timer` that triggers one of those services. Verified
@@ -13,6 +16,10 @@ const UNIT_DIR: &str = "/etc/systemd/system";
 /// `ExecStart=` line in a unit *file* is a plain path
 /// (`ExecStart=/home/you/bin/thing --arg`), not the structured
 /// `{ path=... ; argv[]=... }` form `systemctl show` prints at runtime.
+///
+/// User units: every `.service` in `~/.config/systemd/user` (anything there
+/// was put there by you), plus timers triggering one of them, named with
+/// the `user:` prefix (see `unit.rs`).
 pub fn discover_units(cfg: &Config) -> Vec<String> {
     let home = dirs::home_dir().unwrap_or_default();
     let home_str = home.to_string_lossy().to_string();
@@ -46,6 +53,9 @@ pub fn discover_units(cfg: &Config) -> Vec<String> {
         }
     }
 
+    let user_dir = home.join(".config/systemd/user");
+    units.extend(discover_user_units(&user_dir));
+
     for extra in &cfg.extra_units {
         units.insert(extra.clone());
     }
@@ -54,6 +64,46 @@ pub fn discover_units(cfg: &Config) -> Vec<String> {
     }
 
     units.into_iter().collect()
+}
+
+/// Unit files directly in the user unit dir (symlinked ones included, since
+/// linking a unit in is a normal way to install it). Leftovers such as
+/// `foo.service.bak.123` or `foo.service.disabled-…` don't end in a unit
+/// suffix, so they're skipped by construction.
+fn discover_user_units(dir: &Path) -> Vec<String> {
+    let mut services = BTreeSet::new();
+    let mut timers: Vec<(String, String)> = Vec::new();
+    let Ok(entries) = fs::read_dir(dir) else {
+        return Vec::new();
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_file() {
+            continue; // *.wants/ directories, dangling links
+        }
+        let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+            continue;
+        };
+        if let Some(base) = name.strip_suffix(".service") {
+            if !base.ends_with('@') {
+                services.insert(base.to_string());
+            }
+        } else if name.ends_with(".timer") {
+            let triggered = timer_target_service(&path)
+                .unwrap_or_else(|| name.trim_end_matches(".timer").to_string());
+            timers.push((name.to_string(), triggered));
+        }
+    }
+    let mut out: Vec<String> = services
+        .iter()
+        .map(|b| format!("{USER_PREFIX}{b}.service"))
+        .collect();
+    for (timer, target) in timers {
+        if services.contains(&target) {
+            out.push(format!("{USER_PREFIX}{timer}"));
+        }
+    }
+    out
 }
 
 /// Reads a `.service` file's `ExecStart=` line and checks whether the
@@ -140,6 +190,34 @@ mod tests {
         assert_eq!(
             timer_target_service(&path),
             Some("sigilward-check".to_string())
+        );
+    }
+
+    #[test]
+    fn user_units_get_prefix_and_skip_leftovers() {
+        let dir = std::env::temp_dir().join(format!("cyberwatch_user_{}", std::process::id()));
+        std::fs::create_dir_all(dir.join("default.target.wants")).unwrap();
+        for (name, body) in [
+            (
+                "cyberdesk.service",
+                "[Service]\nExecStart=%h/.local/bin/cyberdesk\n",
+            ),
+            ("cyberdesk.service.bak.1", "[Service]\n"),
+            ("pkg-snapshot.service", "[Service]\nExecStart=/bin/true\n"),
+            ("pkg-snapshot.timer", "[Timer]\nOnCalendar=daily\n"),
+            ("orphan.timer", "[Timer]\nUnit=nothing.service\n"),
+        ] {
+            std::fs::write(dir.join(name), body).unwrap();
+        }
+        let mut got = discover_user_units(&dir);
+        got.sort();
+        assert_eq!(
+            got,
+            vec![
+                "user:cyberdesk.service".to_string(),
+                "user:pkg-snapshot.service".to_string(),
+                "user:pkg-snapshot.timer".to_string(),
+            ]
         );
     }
 

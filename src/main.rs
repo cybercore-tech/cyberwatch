@@ -1,12 +1,7 @@
-mod actions;
 mod app;
-mod config;
-mod discover;
-mod status;
 mod theme;
 mod ui;
 
-use actions::Verb;
 use anyhow::Result;
 use app::{ActionJob, App, Mode, Pending};
 use crossterm::{
@@ -14,6 +9,8 @@ use crossterm::{
     execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
+use cyberwatch::actions::{self, Verb};
+use cyberwatch::{config, discover, status};
 use ratatui::{Terminal, backend::CrosstermBackend};
 use std::io;
 use theme::Theme;
