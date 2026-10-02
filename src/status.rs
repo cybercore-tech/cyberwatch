@@ -32,7 +32,13 @@ impl UnitStatus {
             return true;
         }
         match self.kind {
-            Kind::Timer => self.active_state != "active",
+            // A disabled timer that isn't running is switched off on
+            // purpose; only a failed one, or an enabled one that isn't
+            // active, is a problem.
+            Kind::Timer => {
+                self.active_state == "failed"
+                    || (self.unit_file_state == "enabled" && self.active_state != "active")
+            }
             Kind::Service => {
                 if self.active_state == "failed" {
                     return true;
@@ -184,6 +190,13 @@ mod tests {
     fn timer_needs_attention_when_not_active() {
         assert!(!unit(Kind::Timer, "active", "enabled", "", false).needs_attention());
         assert!(unit(Kind::Timer, "failed", "enabled", "", false).needs_attention());
+        assert!(unit(Kind::Timer, "inactive", "enabled", "", false).needs_attention());
+    }
+
+    #[test]
+    fn disabled_inactive_timer_is_fine() {
+        assert!(!unit(Kind::Timer, "inactive", "disabled", "", false).needs_attention());
+        assert!(unit(Kind::Timer, "failed", "disabled", "", false).needs_attention());
     }
 
     #[test]
