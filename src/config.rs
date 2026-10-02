@@ -14,9 +14,21 @@ pub struct Config {
 }
 
 pub fn config_path() -> PathBuf {
-    dirs::home_dir()
-        .unwrap_or_default()
-        .join(".config/cyberwatch/config.json")
+    config_path_in(&dirs::home_dir().unwrap_or_default())
+}
+
+/// The config file under an explicit home directory (see
+/// `discover::discover_units_in`).
+pub fn config_path_in(home: &std::path::Path) -> PathBuf {
+    home.join(".config/cyberwatch/config.json")
+}
+
+/// Reads an existing config without creating one — for read-only callers.
+pub fn load_from(path: &std::path::Path) -> Result<Config> {
+    if !path.exists() {
+        return Ok(Config::default());
+    }
+    Ok(serde_json::from_str(&fs::read_to_string(path)?)?)
 }
 
 pub fn load_or_init() -> Result<Config> {

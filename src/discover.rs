@@ -21,7 +21,13 @@ const UNIT_DIR: &str = "/etc/systemd/system";
 /// was put there by you), plus timers triggering one of them, named with
 /// the `user:` prefix (see `unit.rs`).
 pub fn discover_units(cfg: &Config) -> Vec<String> {
-    let home = dirs::home_dir().unwrap_or_default();
+    discover_units_in(cfg, &dirs::home_dir().unwrap_or_default())
+}
+
+/// [`discover_units`] for an explicit home directory — for a caller that
+/// isn't running as the user whose units these are (DaemonHall's root
+/// helper, run through pkexec, would otherwise look in /root).
+pub fn discover_units_in(cfg: &Config, home: &Path) -> Vec<String> {
     let home_str = home.to_string_lossy().to_string();
 
     let mut services = BTreeSet::new();
